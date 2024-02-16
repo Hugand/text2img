@@ -1,0 +1,5 @@
+data:
+  target: sgm.data.mnist.MNISTLoader
+  params:
+    batch_size: 512
+    num_workers: 1

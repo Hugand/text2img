@@ -1,5 +1,10 @@
-generative_models/*
-generative_models/*.*
-generative_models
-checkpoints/*
-checkpoints/*.*
+generative-models/
+text2img_dm/
+checkpoints/
+outputs/
+.data/
+datasets/
+lightning_logs/
+
+*.png
+*.jpg

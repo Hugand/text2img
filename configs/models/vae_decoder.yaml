@@ -1,0 +1,59 @@
+model:
+  base_learning_rate: 1.0e-4
+  target: sgm.models.diffusion.DiffusionEngine
+  params:
+    # network_wrapper: sgm.modules.diffusionmodules.wrappers.IdentityWrapper
+  
+    denoiser_config:
+      target: sgm.modules.diffusionmodules.denoiser.Denoiser
+      params:
+        scaling_config:
+          target: sgm.modules.diffusionmodules.denoiser_scaling.EDMScaling
+          params:
+            sigma_data: 1.0
+
+    network_config:
+      target: diffusion_decoder.DecodingUnet
+      params:
+        model_channels: 128
+        dropout: 0.0
+        conv_resample: True
+        use_checkpoint: True
+        use_scale_shift_norm: False
+        resblock_updown: False
+        context_dim: 4
+
+    conditioner_config:
+      target: diffusion_decoder.LatentConditioner
+      params:
+        emb_models:
+          - is_trainable: True
+            input_key: ltnt
+            ucg_rate: 0.2
+            target: sgm.modules.encoders.modules.IdentityEncoder
+            
+    first_stage_config:
+      target: sgm.models.autoencoder.IdentityFirstStage
+
+    loss_fn_config:
+      target: sgm.modules.diffusionmodules.loss.StandardDiffusionLoss
+      params:
+        loss_weighting_config:
+          target: sgm.modules.diffusionmodules.loss_weighting.EDMWeighting
+          params:
+            sigma_data: 1.0
+        sigma_sampler_config:
+          target: sgm.modules.diffusionmodules.sigma_sampling.EDMSampling
+
+    sampler_config:
+      target: sgm.modules.diffusionmodules.sampling.EulerEDMSampler
+      params:
+        num_steps: 100
+
+        discretization_config:
+          target: sgm.modules.diffusionmodules.discretizer.EDMDiscretization
+
+        guider_config:
+          target: sgm.modules.diffusionmodules.guiders.VanillaCFG
+          params:
+            scale: 3.0
