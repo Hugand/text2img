@@ -3,11 +3,11 @@ import torch.nn.functional as F
 import torch
 from einops import rearrange
 from torchvision.utils import save_image
-from generative_models.sgm.modules.attention import SpatialTransformer
+from sgm.modules.attention import SpatialTransformer
 from typing import Optional
 
-from generative_models.sgm.modules.diffusionmodules.openaimodel import Downsample, ResBlock, TimestepEmbedSequential, Upsample
-from generative_models.sgm.modules.diffusionmodules.util import GroupNorm32, timestep_embedding
+from sgm.modules.diffusionmodules.openaimodel import Downsample, ResBlock, TimestepEmbedSequential, Upsample
+from sgm.modules.diffusionmodules.util import GroupNorm32, timestep_embedding
 
 class DecodingUnet(nn.Module):
     def __init__(self,

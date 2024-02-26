@@ -1,9 +1,7 @@
 model:
-  base_learning_rate: 1.0e-4
+  base_learning_rate: 1.5e-5
   target: generative_models.sgm.models.diffusion.DiffusionEngine
   params:
-    # network_wrapper: sgm.modules.diffusionmodules.wrappers.IdentityWrapper
-  
     denoiser_config:
       target: sgm.modules.diffusionmodules.denoiser.Denoiser
       params:
@@ -13,15 +11,15 @@ model:
             sigma_data: 1.0
 
     network_config:
-      target: diffusion_decoder.DecodingUnetConcat
+      target: modules.models.decoding.ddpm_unet_decoder.DDPMUNetDecoder
       params:
-        model_channels: 256
+        model_channels: 192
+        num_head_channels: 4
         dropout: 0.0
         conv_resample: True
         use_checkpoint: True
         use_scale_shift_norm: False
         resblock_updown: False
-        context_dim: 4
 
     conditioner_config:
       target: diffusion_decoder.LatentConditioner
@@ -48,7 +46,7 @@ model:
     sampler_config:
       target: sgm.modules.diffusionmodules.sampling.EulerEDMSampler
       params:
-        num_steps: 40
+        num_steps: 50
 
         discretization_config:
           target: sgm.modules.diffusionmodules.discretizer.EDMDiscretization
@@ -56,4 +54,4 @@ model:
         guider_config:
           target: sgm.modules.diffusionmodules.guiders.VanillaCFG
           params:
-            scale: 3.0
+            scale: 2.0

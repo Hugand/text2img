@@ -15,7 +15,9 @@ from torchmetrics.functional.image.lpips import learned_perceptual_image_patch_s
 from torchmetrics.image import PeakSignalNoiseRatio
 from torchmetrics.functional.image import structural_similarity_index_measure
 from dataloaders.coco17_loader import COCO17Loader, COCO17Val
+from dataloaders.imagenet_loader import ImageNetLatentLoader
 from diffusion_decoder import DecodingUnetConcat
+from eval.reconstruction_eval import ReconstructionEval
 from generate_new_decoder import generate_from_decoder
 from generative_models.sgm.inference.api import (
     SamplingParams,
@@ -32,54 +34,24 @@ from sgm.util import append_dims, instantiate_from_config
 
 from generative_models.sgm.util import disabled_train, load_model_from_config
 from tqdm import tqdm
-
-# from modules.models.decoding.decoding_unet_concat import DecodingUnetConcat
+import glob
 
 device = "cuda"
 seed = 42
 torch.manual_seed(seed)
 
-trainer_opt = {
-    "benchmark": True,
-    "num_sanity_val_steps": 0,
-    "accumulate_grad_batches": 1,
-    "max_epochs": 400,
-    "accelerator": "cuda"
-}
-
-
-# # coco_loader = COCO17Loader(batch_size=1, num_workers=10, dims=(128, 128), test_frac=0)
+# ==== VAE ====
 # model_config = OmegaConf.load("configs/models/cifar10_model.yaml")
-# vae = load_model_from_config(model_config.first_stage_config, "checkpoints/sdxl_vae.safetensors")
-# vae = vae.to("cuda")
-# image_name = "/home/pg51242/Desktop/text2img-gen/outputs/sdxl/base/generated_2.1.png"
-# image = Image.open(image_name)
-# image = image.resize((128, 128))
-# image = np.array(image.convert("RGB"))
-# image = image[None].transpose(0, 3, 1, 2)
-# image = torch.from_numpy(image).to(dtype=torch.float32, device="cuda") / 127.5 - 1.0
-# # latent = torch.load(self.latents_path + image_name + ".pt")
-# print(image.shape)
+# diffusion_decoder = load_model_from_config(model_config.first_stage_config, "checkpoints/sdxl_vae.safetensors")
+# diffusion_decoder = diffusion_decoder.to("cuda")
 
-# with torch.no_grad():
-#     # images = torch.Tensor([])
-#     # latents = torch.Tensor([])
-#     latent = vae.encode(image)
-    # for batch in coco_loader.train_dataloader():
-    #     # print(batch["jpg"][0].shape)
-    #     latent_batch = vae.encode(batch["jpg"].to("cuda"))
-    #     torch.save(latent_batch[0].to("cpu"), "./datasets/coco/val2017_latents_128/" + str(batch["ltnt"][0]) + ".pt")
-    #     # images_recon = torch.cat([vae.decode(latent_batch), batch.to("cpu")], dim=0)
-    #     # images_dd = dd()
-
-# del vae
-
-model_config = OmegaConf.load("configs/models/vae_decoder_concat.yaml")
+# ==== Diffusion Decoder ====
+model_config = OmegaConf.load("configs/models/ddpm_diffusion_decoder.yaml")
 diffusion_decoder = instantiate_from_config(model_config.model)
 sampler = instantiate_from_config(model_config.model.params.sampler_config)
-# 84
+checkpoint_path = glob.glob("lightning_logs/version_136/checkpoints/*.ckpt")[0]
 diffusion_decoder = diffusion_decoder.load_from_checkpoint(
-    "lightning_logs/version_89/checkpoints/epoch=99-step=11300.ckpt",
+    checkpoint_path,
     network_config=model_config.model.params.network_config,
     denoiser_config=model_config.model.params.denoiser_config,
     conditioner_config=model_config.model.params.conditioner_config,
@@ -90,62 +62,53 @@ diffusion_decoder = diffusion_decoder.load_from_checkpoint(
 diffusion_decoder = diffusion_decoder.to(device)
 diffusion_decoder.learning_rate = model_config.model.base_learning_rate
 
-# lpips_list = []
-# psnr_list = []
-# ssim_list = []
-# psnr = PeakSignalNoiseRatio().to("cuda")
-i = 0
-
-# coco = COCO17Val(latents_subdir="val2017_latents_128/", dims=(128, 128))
-# a = coco[0]
-# coco = COCO17Val(latents_subdir="val2017_latents/", dims=(256, 256))
-# b = coco[0]
-
-coco_loader = COCO17Loader(shuffle=False,
-    batch_size=32, num_workers=2, dims=(128, 128),
-    latents_subdir="val2017_latents_128/", test_frac=0.1)
-
-# print(len(coco_loader.train_dataloader()), len(coco_loader.val_dataloader()))
+loader = ImageNetLatentLoader(1, 10, test_frac=0.9900, dims=(128, 128), random_seed=2024, shuffle=False)
 
 with torch.no_grad():
-    # samples = generate_from_decoder(diffusion_decoder, sampler, latent, img_dims=128)
-    # samples = vae.decode(latent)
-    # samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
-    # image = torch.clamp((image + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
-    # print(samples.shape, image.shape)
-    # save_image(samples, 'decoded_unet_imgs_vae.png')
-    # save_image(image, 'decoded_unet_img_origs_vae.png')
-
-    for dl_batch in tqdm(coco_loader.val_dataloader()):
+    smpls = torch.Tensor([]).to("cuda")
+    orig = torch.Tensor([]).to("cuda")
+    i = 0
+    h = 0
+    for dl_batch in tqdm(loader.val_dataloader()):
+        if i < 50:
+            i += 1
+            continue
         samples = generate_from_decoder(diffusion_decoder, sampler, dl_batch["ltnt"].to(device), img_dims=128)
-        # samples = vae.decode(dl_batch["ltnt"].to(device))
+        # samples = diffusion_decoder.decode(dl_batch["ltnt"].to(device))
         # samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
         orig_images = torch.clamp((dl_batch["jpg"] + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
+        smpls = torch.cat([smpls, samples], dim=0)
+        orig = torch.cat([orig, orig_images], dim=0)
 
-        print(samples.shape, orig_images.shape)
+        h += 1
 
-        # lpips = learned_perceptual_image_patch_similarity(samples, orig_images, net_type='squeeze')
-        # psnr_score = psnr(samples, orig_images)
-        # ssim = structural_similarity_index_measure(samples, orig_images)
+        if h >= 4:
+            break
+    
+    i = 0
+    h = 0
+    for dl_batch in tqdm(loader.train_dataloader()):
+        if i < 50:
+            i += 1
+            continue
+        samples = generate_from_decoder(diffusion_decoder, sampler, dl_batch["ltnt"].to(device), img_dims=128)
+        # samples = diffusion_decoder.decode(dl_batch["ltnt"].to(device))
+        # samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
+        orig_images = torch.clamp((dl_batch["jpg"] + 1.0) / 2.0, min=0.0, max=1.0).to("cuda")
+        smpls = torch.cat([smpls, samples], dim=0)
+        orig = torch.cat([orig, orig_images], dim=0)
+        
+        h += 1
 
-        # # lpips_list.append(lpips)
-        # # psnr_list.append(psnr)
-        # # ssim_list.append(ssim)
+        if h >= 4:
+            break
 
+    recon_evaluator = ReconstructionEval("cuda")
+    evaluation_train = recon_evaluator(smpls[4:], orig[4:].to("cuda"))
+    evaluation_val = recon_evaluator(smpls[:4], orig[:4].to("cuda"))
 
-        # print("LPIPS:", lpips)
-        # print("PSNR:", psnr_score)
-        # print("SSIM:", ssim)
-        save_image(samples, 'decoded_unet_img.png')
-        save_image(orig_images, 'decoded_unet_img_orig.png')
+    print("Train eval:", evaluation_train)
+    print("Test eval", evaluation_val)
 
-        break
-
-    # final_lpips = torch.cat(lpips_list, dim=1).mean()
-    # final_psnr = torch.cat(psnr_list, dim=1).mean()
-    # final_ssim = torch.cat(ssim_list, dim=1).mean()
-
-    # print("LPIPS:", final_lpips)
-    # print("PSNR:", final_psnr)
-    # print("SSIM:", final_ssim)
-
+    save_image(smpls.to("cpu"), 'decoded_unet_img_ddpm_val+train.png')
+    save_image(orig.to("cpu"), 'decoded_unet_img_orig_ddpm_val+train.png')
