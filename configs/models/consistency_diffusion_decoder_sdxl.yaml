@@ -1,0 +1,79 @@
+model:
+  base_learning_rate: 1.0e-4
+  target: generative_models.sgm.models.diffusion.DiffusionEngine
+  params:
+    # use_ema: True
+    denoiser_config:
+      target: modules.denoiser.CDDDenoiser
+      params:
+        discretization_config:
+          target: modules.discretizer.CDDDiscretization
+          params:
+            num_timesteps: 1024
+
+        scaling_config:
+          target: modules.scaling.CDDScaling
+          params:
+            sigma_data: 0.5
+
+    network_config:
+      target: modules.models.decoding.openai_decoder.DiffusionDecoder
+      params:
+        model_channels: 320
+        dropout: 0.0
+        use_checkpoint: True
+        use_scale_shift_norm: True
+
+    conditioner_config:
+      target: diffusion_decoder.LatentConditioner
+      params:
+        emb_models:
+          - is_trainable: True
+            input_key: ltnt
+            ucg_rate: 0.2
+            target: sgm.modules.encoders.modules.IdentityEncoder
+            
+    first_stage_config:
+      target: sgm.models.autoencoder.IdentityFirstStage
+
+    loss_fn_config:
+      target: sgm.modules.diffusionmodules.loss.StandardDiffusionLoss
+      params:
+        loss_weighting_config:
+          target: sgm.modules.diffusionmodules.loss_weighting.EDMWeighting
+          params:
+            sigma_data: 0.5
+        sigma_sampler_config:
+          target: sgm.modules.diffusionmodules.sigma_sampling.EDMSampling
+
+    # sampler_config:
+    #   target: sgm.modules.diffusionmodules.sampling.EulerEDMSampler
+    #   params:
+    #     num_steps: 4
+
+    #     discretization_config:
+    #       target: sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization
+
+    #     guider_config:
+    #       target: sgm.modules.diffusionmodules.guiders.IdentityGuider
+    #       # params:
+    #       #   scale: 2.0
+
+    sampler_config:
+      target: modules.sampling.CDDSampler
+      params:
+        num_steps: 1024
+        n_schedule_steps: 25
+        # schedule: [1.0, 0.5]
+
+        discretization_config:
+          target: modules.discretizer.CDDDiscretization
+          params:
+            num_timesteps: 1024
+
+        guider_config:
+          target: sgm.modules.diffusionmodules.guiders.IdentityGuider
+    #     guider_config:
+    #       target: sgm.modules.diffusionmodules.guiders.IdentityGuider
+    #       # params:
+    #       #   scale: 2.0

@@ -12,9 +12,10 @@ from sgm.modules.encoders.modules import AbstractEmbModel
 from generative_models.sgm.util import count_params, disabled_train, expand_dims_like, instantiate_from_config
 
 class LatentConditioner(nn.Module):
-    def __init__(self, emb_models: Union[List, ListConfig]):
+    def __init__(self, emb_models: Union[List, ListConfig], scale_factor=1.0):
         super().__init__()
         embedders = []
+        self.scale_factor = scale_factor
         for n, embconfig in enumerate(emb_models):
             embedder = instantiate_from_config(embconfig)
             assert isinstance(
@@ -102,6 +103,8 @@ class LatentConditioner(nn.Module):
                     )
                 else:
                     output[out_key] = emb
+
+                output[out_key] = output[out_key] * self.scale_factor
 
         return output
     

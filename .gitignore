@@ -1,10 +1,12 @@
-generative-models/
+# generative-models/
 text2img_dm/
 checkpoints/
 outputs/
 .data/
 datasets/
 lightning_logs/
+wandb/
 
 *.png
 *.jpg
+*.pt

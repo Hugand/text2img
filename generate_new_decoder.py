@@ -4,17 +4,18 @@ import math
 import generative_models.sgm.inference.helpers as helpers
 
 device = "cuda"
-seed = 42
-torch.manual_seed(seed)
 
-def generate_from_decoder(decoder, sampler, latent_batch, img_dims=256, random_seed=None):
+
+def generate_from_decoder(decoder, sampler, latent_batch, img_dims=256, random_seed=None, noise_inp=None, seed=42):
+    torch.manual_seed(seed)
+
     if not random_seed == None:
         torch.manual_seed(random_seed)
 
     n_samples = len(latent_batch)
 
-    H = img_dims
-    W = img_dims
+    H = latent_batch.shape[2] * 8
+    W = latent_batch.shape[3] * 8
     C = 3
     F = 8
     n_samples = [n_samples]
@@ -58,7 +59,8 @@ def generate_from_decoder(decoder, sampler, latent_batch, img_dims=256, random_s
                 # Shape of the noise
                 shape = (math.prod(n_samples), C, H, W)
                 random_noise = torch.randn(shape).to(device)
-                
+                if noise_inp != None:
+                    random_noise = noise_inp
                 def denoiser(input, sigma, c):
                     return decoder.denoiser(
                         decoder.model, input, sigma, c, **additional_model_inputs
